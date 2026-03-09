@@ -1,26 +1,27 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.services.instagram_service import InstagramService
-from src.infrastructure.repositories.instagram_repository import InstagramRepository
+from src.interfaces.dependencies import get_db_session
 from src.infrastructure.tokens import get_instagram_token, TokenNotFoundError
+
 router = APIRouter(prefix="/api/v1", tags=["instagram"])
 
 
-def _get_service(ig_user_id: str) -> InstagramService:
+@router.post("/analytics/instagram/{ig_user_id}", summary="Trigger Instagram data collection")
+async def collect_instagram(
+    ig_user_id: str,
+    period: str = "day",
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Ручной запуск сбора данных для Instagram-аккаунта."""
     try:
         token = get_instagram_token(ig_user_id)
     except TokenNotFoundError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
-    return InstagramService(InstagramRepository(), token)
-
-
-@router.post("/analytics/instagram/{ig_user_id}", summary="Trigger Instagram data collection")
-async def collect_instagram(ig_user_id: str, period: str = "day"):
-    """Ручной запуск сбора данных для Instagram-аккаунта."""
-    service = _get_service(ig_user_id)
     try:
-        await service.collect(ig_user_id, period)
+        await InstagramService(session, token).collect(ig_user_id, period)
     except Exception as exc:
         logger.exception(f"Сбор данных Instagram завершился с ошибкой для {ig_user_id}")
         raise HTTPException(status_code=502, detail=f"Instagram API error: {exc}")

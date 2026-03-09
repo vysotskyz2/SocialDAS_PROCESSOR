@@ -1,8 +1,8 @@
 from loguru import logger
 
 from src.application.services.youtube_service import YouTubeService
+from src.infrastructure.database import async_session_factory
 from src.infrastructure.kafka.base_consumer import BaseConsumer
-from src.infrastructure.repositories.youtube_repository import YouTubeRepository
 from src.infrastructure.tokens import get_youtube_credentials, TokenNotFoundError
 from src.schemas.kafka import KafkaMessage
 from src.settings import kafka_settings
@@ -19,5 +19,6 @@ class YouTubeConsumer(BaseConsumer):
             logger.warning(f"Credentials YouTube для канала {yt_channel_id} не найдены — пропускаем")
             return
 
-        service = YouTubeService(YouTubeRepository(), creds)
-        await service.collect(yt_channel_id)
+        async with async_session_factory() as session:
+            async with session.begin():
+                await YouTubeService(session, creds).collect(yt_channel_id)

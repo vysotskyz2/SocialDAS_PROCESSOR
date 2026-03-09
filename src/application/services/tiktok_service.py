@@ -1,6 +1,7 @@
 import httpx
 from httpx import AsyncClient
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.repositories.tiktok_repository import TikTokRepository
 from src.infrastructure.tiktok_token_manager import get_valid_access_token, _do_refresh, _cache, _save_file
@@ -12,8 +13,8 @@ VIDEO_FIELDS = "id,title,video_description,duration,cover_image_url,share_url,li
 
 class TikTokService:
 
-    def __init__(self, repository: TikTokRepository, tt_user_id: str):
-        self.repo = repository
+    def __init__(self, session: AsyncSession, tt_user_id: str):
+        self.session = session
         self.tt_user_id = tt_user_id
 
     async def _headers(self) -> dict:
@@ -59,17 +60,23 @@ class TikTokService:
         return resp
 
     async def collect(self, tt_user_id: str) -> None:
-        """Загружает профиль и список видео TikTok-аккаунта, сохраняет в БД."""
+        """Загружает профиль и список видео TikTok-аккаунта, сохраняет в БД через переданную сессию."""
         async with AsyncClient(timeout=tiktok_settings.http_timeout) as client:
             user_data = await self._fetch_user(client)
             if not user_data:
                 logger.warning(f"Данные пользователя TikTok {tt_user_id} не получены")
                 return
+            video_list = await self._fetch_videos(client)
 
-            user_id = await self.repo.upsert_user(user_data)
-            await self.repo.upsert_user_snapshot(user_id, user_data)
-
-            await self._collect_videos(client, user_id)
+        repo = TikTokRepository(self.session)
+        user_id = await repo.upsert_user(user_data)
+        await repo.upsert_user_snapshot(user_id, user_data)
+        for item in video_list:
+            try:
+                video_id = await repo.upsert_video(user_id, item)
+                await repo.upsert_video_snapshot(video_id, item)
+            except Exception:
+                logger.exception(f"Ошибка сохранения видео TikTok {item.id}")
 
         logger.info(f"Сбор данных TikTok завершён для {tt_user_id}")
 
@@ -83,7 +90,7 @@ class TikTokService:
         parsed = TTUserInfoResponse.model_validate(resp.json())
         return parsed.data
 
-    async def _collect_videos(self, client: AsyncClient, user_id, cursor: int = 0, max_count: int = 20) -> None:
+    async def _fetch_videos(self, client: AsyncClient, cursor: int = 0, max_count: int = 20) -> list:
         resp = await self._post(
             client,
             f"{tiktok_settings.base_url}/video/list/",
@@ -91,12 +98,4 @@ class TikTokService:
             json={"max_count": max_count, "cursor": cursor},
         )
         parsed = TTVideoListResponse.model_validate(resp.json())
-        if not parsed.data:
-            return
-
-        for item in parsed.data.videos:
-            try:
-                video_id = await self.repo.upsert_video(user_id, item)
-                await self.repo.upsert_video_snapshot(video_id, item)
-            except Exception:
-                logger.exception(f"Ошибка сохранения видео TikTok {item.id}")
+        return parsed.data.videos if parsed.data else []

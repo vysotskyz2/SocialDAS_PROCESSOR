@@ -12,7 +12,7 @@ class YouTubeSettings(BaseSettings):
     project_id: str = ""
     client_secret: str = ""
     auth_uri: str = "https://accounts.google.com/o/oauth2/auth"
-    token_uri: str = "https://oauth2.googleapis.com/token"
+    token_uri: str = ""
     auth_provider: str = "https://www.googleapis.com/oauth2/v1/certs"
     redirect_uris: str = ""
     javascript_origins: str = ""

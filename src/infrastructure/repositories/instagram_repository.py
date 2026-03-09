@@ -1,21 +1,23 @@
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from uuid import UUID
 
+import sqlalchemy as sa
 from loguru import logger
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.database import async_session_factory
 from src.infrastructure.models.instagram import (
-    User, UserSnapshot, Post, PostInsight, Story, ProfileInsight, MediaType, InsightPeriod,
+    User, UserSnapshot, Post, Story, ProfileInsight, MediaType, InsightPeriod,
 )
 from src.schemas.instagram import IGProfileResponse, IGMediaItem, IGStoryItem, IGInsightMetric
 
 
 class InstagramRepository:
 
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
     async def upsert_user(self, profile: IGProfileResponse) -> UUID:
-        """Вставляет или обновляет пользователя Instagram по ig_id. Возвращает внутренний UUID."""
         values = {
             "ig_id": profile.id,
             "username": profile.username,
@@ -33,10 +35,9 @@ class InstagramRepository:
             )
             .returning(User.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_user_snapshot(self, user_id: UUID, profile: IGProfileResponse) -> None:
         today = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -54,10 +55,10 @@ class InstagramRepository:
                 constraint="uix_ig_user_snapshot_date",
                 set_={k: v for k, v in values.items() if k not in ("user_id", "date")},
             )
+            .returning(UserSnapshot.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
 
     async def upsert_post(self, user_id: UUID, item: IGMediaItem) -> UUID:
         try:
@@ -87,10 +88,9 @@ class InstagramRepository:
             )
             .returning(Post.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_story(self, user_id: UUID, item: IGStoryItem) -> None:
         try:
@@ -118,10 +118,10 @@ class InstagramRepository:
                 index_elements=["ig_id"],
                 set_={k: v for k, v in values.items() if k not in ("ig_id", "user_id")},
             )
+            .returning(Story.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
 
     async def upsert_profile_insight(
         self, user_id: UUID, metric: IGInsightMetric, snapshot_date: datetime
@@ -146,7 +146,8 @@ class InstagramRepository:
                 constraint="uix_ig_profile_insight_user_date_period",
                 set_={metric.name: total},
             )
+            .returning(ProfileInsight.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
+

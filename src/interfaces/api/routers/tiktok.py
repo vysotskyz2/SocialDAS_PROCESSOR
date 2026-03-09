@@ -1,20 +1,24 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.services.tiktok_service import TikTokService
-from src.infrastructure.repositories.tiktok_repository import TikTokRepository
+from src.interfaces.dependencies import get_db_session
 from src.infrastructure.tokens import TokenNotFoundError
 from src.infrastructure.tiktok_token_manager import save_token_pair
+
 router = APIRouter(prefix="/api/v1", tags=["tiktok"])
 
 
 @router.post("/analytics/tiktok/{tt_user_id}", summary="Trigger TikTok data collection")
-async def collect_tiktok(tt_user_id: str):
+async def collect_tiktok(
+    tt_user_id: str,
+    session: AsyncSession = Depends(get_db_session),
+):
     """Ручной запуск сбора данных для TikTok-аккаунта."""
     try:
-        service = TikTokService(TikTokRepository(), tt_user_id)
-        await service.collect(tt_user_id)
+        await TikTokService(session, tt_user_id).collect(tt_user_id)
     except TokenNotFoundError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
     except RuntimeError as exc:

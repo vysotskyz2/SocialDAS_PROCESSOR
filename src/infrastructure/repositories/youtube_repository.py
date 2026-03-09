@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from loguru import logger
+import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.database import async_session_factory
 from src.infrastructure.models.youtube import YouTubeChannel, YouTubeChannelSnapshot, YouTubeVideo, YouTubeVideoSnapshot
 from src.schemas.youtube import YTChannelItem, YTVideoItem
 
@@ -17,6 +17,9 @@ def _safe_int(value: str | None) -> int | None:
 
 
 class YouTubeRepository:
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
 
     async def upsert_channel(self, item: YTChannelItem) -> UUID:
         snippet = item.snippet or {}
@@ -45,10 +48,9 @@ class YouTubeRepository:
             )
             .returning(YouTubeChannel.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_channel_snapshot(self, channel_id: UUID, item: YTChannelItem) -> None:
         stats = item.statistics
@@ -67,10 +69,10 @@ class YouTubeRepository:
                 constraint="uix_yt_channel_snapshot_date",
                 set_={k: v for k, v in values.items() if k not in ("channel_id", "date")},
             )
+            .returning(YouTubeChannelSnapshot.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
 
     async def upsert_video(self, channel_id: UUID, item: YTVideoItem) -> UUID:
         snippet = item.snippet
@@ -98,10 +100,9 @@ class YouTubeRepository:
             )
             .returning(YouTubeVideo.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_video_snapshot(self, video_id: UUID, item: YTVideoItem) -> None:
         stats = item.statistics
@@ -120,7 +121,8 @@ class YouTubeRepository:
                 constraint="uix_yt_video_snapshot_date",
                 set_={k: v for k, v in values.items() if k not in ("video_id", "date")},
             )
+            .returning(YouTubeVideoSnapshot.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
+

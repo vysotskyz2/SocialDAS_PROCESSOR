@@ -2,6 +2,7 @@ import google.oauth2.credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from src.infrastructure.repositories.youtube_repository import YouTubeRepository
@@ -69,12 +70,12 @@ def _fetch_sync(
 
 class YouTubeService:
 
-    def __init__(self, repository: YouTubeRepository, creds: google.oauth2.credentials.Credentials):
-        self.repo = repository
+    def __init__(self, session: AsyncSession, creds: google.oauth2.credentials.Credentials):
+        self.session = session
         self.creds = creds
 
     async def collect(self, yt_channel_id: str) -> None:
-        """Загружает информацию о канале и все видео YouTube, сохраняет в БД."""
+        """Загружает информацию о канале и все видео YouTube, сохраняет в БД через переданную сессию."""
         channel_dict, video_dicts = await run_in_threadpool(
             _fetch_sync,
             creds=self.creds,
@@ -86,15 +87,16 @@ class YouTubeService:
             logger.warning(f"Канал {yt_channel_id} не найден на YouTube")
             return
 
+        repo = YouTubeRepository(self.session)
         channel_item = YTChannelItem.model_validate(channel_dict)
-        channel_id = await self.repo.upsert_channel(channel_item)
-        await self.repo.upsert_channel_snapshot(channel_id, channel_item)
+        channel_id = await repo.upsert_channel(channel_item)
+        await repo.upsert_channel_snapshot(channel_id, channel_item)
 
         for video_dict in video_dicts:
             try:
                 video_item = YTVideoItem.model_validate(video_dict)
-                video_id = await self.repo.upsert_video(channel_id, video_item)
-                await self.repo.upsert_video_snapshot(video_id, video_item)
+                video_id = await repo.upsert_video(channel_id, video_item)
+                await repo.upsert_video_snapshot(video_id, video_item)
             except Exception:
                 logger.exception(f"Ошибка сохранения видео YouTube {video_dict.get('id')}")
 
