@@ -27,7 +27,7 @@ class TikTokService:
         """GET-запрос с автоматическим обновлением токена при 401."""
         resp = await client.get(url, headers=await self._headers(), **kwargs)
         if resp.status_code == 401:
-            logger.warning("TikTok 401 для пользователя {} — обновляем токен и повторяем запрос", self.tt_user_id)
+            logger.warning(f"TikTok 401 для пользователя {self.tt_user_id} — обновляем токен и повторяем запрос")
             # принудительное обновление, игнорируя кеш
             from src.infrastructure import tiktok_token_manager as mgr
             async with mgr._lock:
@@ -45,7 +45,7 @@ class TikTokService:
         """POST-запрос с автоматическим обновлением токена при 401."""
         resp = await client.post(url, headers=await self._headers(), **kwargs)
         if resp.status_code == 401:
-            logger.warning("TikTok 401 для пользователя {} — обновляем токен и повторяем запрос", self.tt_user_id)
+            logger.warning(f"TikTok 401 для пользователя {self.tt_user_id} — обновляем токен и повторяем запрос")
             from src.infrastructure import tiktok_token_manager as mgr
             async with mgr._lock:
                 if mgr._cache is None:
@@ -63,7 +63,7 @@ class TikTokService:
         async with AsyncClient(timeout=30.0) as client:
             user_data = await self._fetch_user(client)
             if not user_data:
-                logger.warning("Данные пользователя TikTok {} не получены", tt_user_id)
+                logger.warning(f"Данные пользователя TikTok {tt_user_id} не получены")
                 return
 
             user_id = await self.repo.upsert_user(user_data)
@@ -71,7 +71,7 @@ class TikTokService:
 
             await self._collect_videos(client, user_id)
 
-        logger.info("Сбор данных TikTok завершён для {}", tt_user_id)
+        logger.info(f"Сбор данных TikTok завершён для {tt_user_id}")
 
     async def _fetch_user(self, client: AsyncClient):
         resp = await self._get(
@@ -99,4 +99,4 @@ class TikTokService:
                 video_id = await self.repo.upsert_video(user_id, item)
                 await self.repo.upsert_video_snapshot(video_id, item)
             except Exception:
-                logger.exception("Ошибка сохранения видео TikTok {}", item.id)
+                logger.exception(f"Ошибка сохранения видео TikTok {item.id}")

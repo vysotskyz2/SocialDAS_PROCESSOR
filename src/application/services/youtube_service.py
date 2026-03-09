@@ -21,7 +21,7 @@ class YouTubeService:
         async with AsyncClient(timeout=30.0) as client:
             channel_item = await self._fetch_channel(client, yt_channel_id)
             if not channel_item:
-                logger.warning("Канал {} не найден на YouTube", yt_channel_id)
+                logger.warning(f"Канал {yt_channel_id} не найден на YouTube")
                 return
 
             channel_id = await self.repo.upsert_channel(channel_item)
@@ -29,7 +29,7 @@ class YouTubeService:
 
             await self._collect_videos(client, yt_channel_id, channel_id)
 
-        logger.info("Сбор данных YouTube завершён для {}", yt_channel_id)
+        logger.info(f"Сбор данных YouTube завершён для {yt_channel_id}")
 
     async def _fetch_channel(self, client: AsyncClient, yt_channel_id: str):
         resp = await client.get(
@@ -81,4 +81,4 @@ class YouTubeService:
                 video_id = await self.repo.upsert_video(channel_id, item)
                 await self.repo.upsert_video_snapshot(video_id, item)
             except Exception:
-                logger.exception("Ошибка сохранения видео YouTube {}", item.id)
+                logger.exception(f"Ошибка сохранения видео YouTube {item.id}")

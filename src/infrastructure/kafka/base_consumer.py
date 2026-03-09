@@ -27,13 +27,13 @@ class BaseConsumer(ABC):
 
     async def run(self) -> None:
         await self._consumer.start()
-        logger.info("Консьюмер запущен для топика '{}'", self.topic)
+        logger.info(f"Консьюмер запущен для топика '{self.topic}'")
         try:
             async for msg in self._consumer:
                 await self._handle(msg.value)
         finally:
             await self._consumer.stop()
-            logger.info("Консьюмер остановлен для топика '{}'", self.topic)
+            logger.info(f"Консьюмер остановлен для топика '{self.topic}'")
 
     async def stop(self) -> None:
         await self._consumer.stop()
@@ -42,15 +42,13 @@ class BaseConsumer(ABC):
         try:
             message = KafkaMessage.model_validate(payload)
         except ValidationError as exc:
-            logger.error("Некорректное сообщение Kafka в топике '{}': {} | payload={}", self.topic, exc, payload)
+            logger.error(f"Некорректное сообщение Kafka в топике '{self.topic}': {exc} | payload={payload}")
             return
         try:
             await self.process_message(message)
         except Exception:
             logger.exception(
-                "Необработанная ошибка при обработке сообщения для аккаунта {} в топике '{}'",
-                payload.get("account_id"),
-                self.topic,
+                f"Необработанная ошибка при обработке сообщения для аккаунта {payload.get('account_id')} в топике '{self.topic}'"
             )
 
     @abstractmethod

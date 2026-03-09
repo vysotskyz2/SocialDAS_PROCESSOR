@@ -22,6 +22,6 @@ async def collect_youtube(yt_channel_id: str):
     try:
         await service.collect(yt_channel_id)
     except Exception as exc:
-        logger.exception("Сбор данных YouTube завершился с ошибкой для {}", yt_channel_id)
+        logger.exception(f"Сбор данных YouTube завершился с ошибкой для {yt_channel_id}")
         raise HTTPException(status_code=502, detail=f"YouTube API error: {exc}")
     return {"status": "ok", "yt_channel_id": yt_channel_id}

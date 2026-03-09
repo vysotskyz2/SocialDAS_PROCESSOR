@@ -18,7 +18,7 @@ class TikTokConsumer(BaseConsumer):
             service = TikTokService(TikTokRepository(), tt_user_id)
             await service.collect(tt_user_id)
         except TokenNotFoundError:
-            logger.warning("Токен TikTok для аккаунта {} не найден — пропускаем", tt_user_id)
+            logger.warning(f"Токен TikTok для аккаунта {tt_user_id} не найден — пропускаем")
         except RuntimeError as exc:
             # Рефреш-токен истёк — требуется повторная авторизация
-            logger.error("Ошибка токена TikTok для {}: {}", tt_user_id, exc)
+            logger.error(f"Ошибка токена TikTok для {tt_user_id}: {exc}")

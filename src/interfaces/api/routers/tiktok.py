@@ -20,7 +20,7 @@ async def collect_tiktok(tt_user_id: str):
     except RuntimeError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
     except Exception as exc:
-        logger.exception("Сбор данных TikTok завершился с ошибкой для {}", tt_user_id)
+        logger.exception(f"Сбор данных TikTok завершился с ошибкой для {tt_user_id}")
         raise HTTPException(status_code=502, detail=f"TikTok API error: {exc}")
     return {"status": "ok", "tt_user_id": tt_user_id}
 

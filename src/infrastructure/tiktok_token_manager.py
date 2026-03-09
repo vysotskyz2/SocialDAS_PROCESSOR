@@ -144,11 +144,7 @@ async def _do_refresh(user_id: str, token_data: dict) -> dict:
         "scope": body.get("scope", token_data.get("scope", "")),
     }
 
-    logger.info(
-        "Токен TikTok обновлён для пользователя {} — новый expires_at={}",
-        user_id,
-        updated["expires_at"],
-    )
+    logger.info(f"Токен TikTok обновлён для пользователя {user_id} — новый expires_at={updated['expires_at']}")
     return updated
 
 
@@ -165,7 +161,7 @@ async def get_valid_access_token(user_id: str) -> str:
         token_data = _cache[user_id]
 
         if _is_expired(token_data):
-            logger.info("Токен доступа TikTok истёк для {}, обновляем...", user_id)
+            logger.info(f"Токен доступа TikTok истёк для {user_id}, обновляем...")
             token_data = await _do_refresh(user_id, token_data)
             _cache[user_id] = token_data
             _save_file(_cache)
@@ -196,7 +192,7 @@ async def save_token_pair(
             "scope": scope,
         }
         _save_file(_cache)
-    logger.info("Новая пара токенов TikTok сохранена для пользователя {}", user_id)
+    logger.info(f"Новая пара токенов TikTok сохранена для пользователя {user_id}")
 
 
 async def refresh_all_expiring(buffer: timedelta = timedelta(hours=2)) -> None:
@@ -216,7 +212,7 @@ async def refresh_all_expiring(buffer: timedelta = timedelta(hours=2)) -> None:
                     _cache[user_id] = refreshed
                     _save_file(_cache)
         except Exception:
-            logger.exception("Ошибка опережающего обновления токена TikTok для {}", user_id)
+            logger.exception(f"Ошибка опережающего обновления токена TikTok для {user_id}")
 
 
 def all_user_ids() -> list[str]:

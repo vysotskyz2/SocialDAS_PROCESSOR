@@ -16,7 +16,7 @@ class YouTubeConsumer(BaseConsumer):
         try:
             api_key = get_youtube_token(yt_channel_id)
         except TokenNotFoundError:
-            logger.warning("API-ключ YouTube для канала {} не найден — пропускаем", yt_channel_id)
+            logger.warning(f"API-ключ YouTube для канала {yt_channel_id} не найден — пропускаем")
             return
 
         service = YouTubeService(YouTubeRepository(), api_key)

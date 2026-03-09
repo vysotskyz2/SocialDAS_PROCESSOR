@@ -18,7 +18,7 @@ def _load_tokens(filename: str) -> dict:
             # удаляем служебный ключ из шаблонных файлов
             return {k: v for k, v in data.items() if not k.startswith("_")}
     except FileNotFoundError:
-        logger.warning("Файл токенов {} не найден", filename)
+        logger.warning(f"Файл токенов {filename} не найден")
         return {}
 
 

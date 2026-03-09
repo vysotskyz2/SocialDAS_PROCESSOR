@@ -28,7 +28,7 @@ class InstagramService:
             await self._collect_insights(client, ig_user_id, user_id, period)
             await self._collect_stories(client, ig_user_id, user_id)
 
-        logger.info("Сбор данных Instagram завершён для {}", ig_user_id)
+        logger.info(f"Сбор данных Instagram завершён для {ig_user_id}")
 
     async def _fetch_profile(self, client: AsyncClient, ig_user_id: str) -> IGProfileResponse:
         resp = await client.get(
@@ -57,7 +57,7 @@ class InstagramService:
             try:
                 await self.repo.upsert_post(user_id, item)
             except Exception:
-                logger.exception("Ошибка сохранения поста {}", item.id)
+                logger.exception(f"Ошибка сохранения поста {item.id}")
 
     async def _collect_insights(self, client: AsyncClient, ig_user_id: str, user_id, period: str) -> None:
         resp = await client.get(
@@ -76,7 +76,7 @@ class InstagramService:
             try:
                 await self.repo.upsert_profile_insight(user_id, metric, snapshot_date)
             except Exception:
-                logger.exception("Ошибка сохранения метрики {}", metric.name)
+                logger.exception(f"Ошибка сохранения метрики {metric.name}")
 
     async def _collect_stories(self, client: AsyncClient, ig_user_id: str, user_id) -> None:
         resp = await client.get(
@@ -93,4 +93,4 @@ class InstagramService:
             try:
                 await self.repo.upsert_story(user_id, item)
             except Exception:
-                logger.exception("Ошибка сохранения сторис {}", item.id)
+                logger.exception(f"Ошибка сохранения сторис {item.id}")

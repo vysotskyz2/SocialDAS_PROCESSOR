@@ -129,7 +129,7 @@ class InstagramRepository:
         try:
             period = InsightPeriod(metric.period)
         except ValueError:
-            logger.warning("Неизвестный период метрики: {}", metric.period)
+            logger.warning(f"Неизвестный период метрики: {metric.period}")
             return
 
         total = (metric.total_value or {}).get("value", 0)

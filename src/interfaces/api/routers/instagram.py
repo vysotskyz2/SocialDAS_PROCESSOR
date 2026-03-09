@@ -22,6 +22,6 @@ async def collect_instagram(ig_user_id: str, period: str = "day"):
     try:
         await service.collect(ig_user_id, period)
     except Exception as exc:
-        logger.exception("Сбор данных Instagram завершился с ошибкой для {}", ig_user_id)
+        logger.exception(f"Сбор данных Instagram завершился с ошибкой для {ig_user_id}")
         raise HTTPException(status_code=502, detail=f"Instagram API error: {exc}")
     return {"status": "ok", "ig_user_id": ig_user_id}
