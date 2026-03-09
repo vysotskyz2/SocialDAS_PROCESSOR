@@ -25,10 +25,12 @@ import httpx
 from loguru import logger
 
 from src.infrastructure.tokens import TokenNotFoundError
+from src.settings import tiktok_settings
 
-_TOKEN_FILE = Path(__file__).parent.parent.parent / "tokens2.json"
-_REFRESH_URL = "https://open.tiktokapis.com/v2/oauth/token/"
-_REFRESH_BUFFER = timedelta(hours=1)  # обновляем, если осталось менее 1 часа
+_BASE = Path(__file__).parent.parent.parent  # project root
+_TOKEN_FILE = _BASE / tiktok_settings.tokens_file
+_REFRESH_URL = f"{tiktok_settings.base_url}/oauth/token/"
+_REFRESH_BUFFER = timedelta(hours=tiktok_settings.refresh_buffer_hours)
 
 # Кеш в памяти (user_id -> данные токена)
 _cache: dict[str, dict] | None = None
@@ -112,7 +114,7 @@ async def _do_refresh(user_id: str, token_data: dict) -> dict:
             "Re-authorize the account."
         )
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=tiktok_settings.http_timeout) as client:
         resp = await client.post(
             _REFRESH_URL,
             data={
@@ -133,8 +135,8 @@ async def _do_refresh(user_id: str, token_data: dict) -> dict:
         )
 
     now = datetime.now(tz=timezone.utc)
-    expires_in: int = body.get("expires_in", 86400)
-    refresh_expires_in: int = body.get("refresh_expires_in", 31536000)
+    expires_in: int = body.get("expires_in", tiktok_settings.access_token_ttl)
+    refresh_expires_in: int = body.get("refresh_expires_in", tiktok_settings.refresh_token_ttl)
 
     updated = {
         "access_token": body["access_token"],
@@ -173,8 +175,8 @@ async def save_token_pair(
     user_id: str,
     access_token: str,
     refresh_token: str,
-    expires_in: int = 86400,
-    refresh_expires_in: int = 31536000,
+    expires_in: int = tiktok_settings.access_token_ttl,
+    refresh_expires_in: int = tiktok_settings.refresh_token_ttl,
     scope: str = "",
 ) -> None:
     """Сохраняет начальную или обновлённую пару токенов (например, после OAuth-колбека)."""

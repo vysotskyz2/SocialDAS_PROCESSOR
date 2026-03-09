@@ -5,8 +5,8 @@ from loguru import logger
 from src.infrastructure.repositories.tiktok_repository import TikTokRepository
 from src.infrastructure.tiktok_token_manager import get_valid_access_token, _do_refresh, _cache, _save_file
 from src.schemas.tiktok import TTUserInfoResponse, TTVideoListResponse
+from src.settings import tiktok_settings
 
-TIKTOK_BASE = "https://open.tiktokapis.com/v2"
 VIDEO_FIELDS = "id,title,video_description,duration,cover_image_url,share_url,like_count,comment_count,share_count,view_count,create_time"
 
 
@@ -60,7 +60,7 @@ class TikTokService:
 
     async def collect(self, tt_user_id: str) -> None:
         """Загружает профиль и список видео TikTok-аккаунта, сохраняет в БД."""
-        async with AsyncClient(timeout=30.0) as client:
+        async with AsyncClient(timeout=tiktok_settings.http_timeout) as client:
             user_data = await self._fetch_user(client)
             if not user_data:
                 logger.warning(f"Данные пользователя TikTok {tt_user_id} не получены")
@@ -76,7 +76,7 @@ class TikTokService:
     async def _fetch_user(self, client: AsyncClient):
         resp = await self._get(
             client,
-            f"{TIKTOK_BASE}/user/info/",
+            f"{tiktok_settings.base_url}/user/info/",
             params={"fields": "open_id,union_id,avatar_url,display_name,bio_description,"
                               "follower_count,following_count,likes_count,video_count"},
         )
@@ -86,7 +86,7 @@ class TikTokService:
     async def _collect_videos(self, client: AsyncClient, user_id, cursor: int = 0, max_count: int = 20) -> None:
         resp = await self._post(
             client,
-            f"{TIKTOK_BASE}/video/list/",
+            f"{tiktok_settings.base_url}/video/list/",
             params={"fields": VIDEO_FIELDS},
             json={"max_count": max_count, "cursor": cursor},
         )

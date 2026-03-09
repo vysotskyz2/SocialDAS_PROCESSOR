@@ -1,23 +1,19 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, HTTPException, Depends
 from httpx import AsyncClient
-import json
-#instagram router
+
+from src.infrastructure.tokens import get_instagram_token, TokenNotFoundError
+from src.settings import instagram_settings
+
 
 def get_token_ig(ig_user_id: str) -> str:
     try:
-        with open("tokens.json", "r", encoding="utf-8") as f:
-            tokens = json.load(f)
-
+        return get_instagram_token(ig_user_id)
+    except TokenNotFoundError:
+        raise HTTPException(status_code=401, detail=f"Instagram account {ig_user_id} not connected")
     except FileNotFoundError:
         raise HTTPException(status_code=401, detail="Tokens file not found")
-
-    if ig_user_id not in tokens:
-        raise HTTPException(
-            status_code=401,
-            detail=f" instagram account {ig_user_id} not connected"
-        )
-    return tokens[ig_user_id]
-
 
 
 async def get_api_client() -> AsyncClient:
@@ -25,18 +21,9 @@ async def get_api_client() -> AsyncClient:
         yield client
 
 
-BASE_URL = "https://socialdas-ig.loca.lt/"
-TT_BASE_URL = "https://open.tiktokapis.com/v2"
-INSTAGRAM_CONFIG = {
-    "client_id": "1120894473412015",
-    "client_secret": "b0cabfd4ed1f3aeb3f2fae79e1951518",
-    "redirect_uri": f"{BASE_URL}/api/v1/auth/instagram/callback",
-    "api_version": "v24.0",
-    "graph_host": "https://graph.facebook.com/",
-    "verify_token": "socialdas_webhook_verify_2026"
-}
-
 router = APIRouter(tags=["instagram"])
+
+_ig_base = f"{instagram_settings.graph_host}/{instagram_settings.api_version}"
 
 #instagram
 @router.get("/api/v1/analytics/instagram/{ig_user_id}")
@@ -50,21 +37,21 @@ async def get_insights(
     data = {}
     urls = {
         'profile_data': (
-            f"{INSTAGRAM_CONFIG['graph_host']}/{INSTAGRAM_CONFIG['api_version']}/{ig_user_id}",
+            f"{_ig_base}/{ig_user_id}",
             {
                 "fields": "id,username,name,profile_picture_url,followers_count,follows_count,media_count,biography,"
                           "website",
                 "access_token": token
             }),
         'media_data': (
-            f"{INSTAGRAM_CONFIG['graph_host']}/{INSTAGRAM_CONFIG['api_version']}/{ig_user_id}/media",
+            f"{_ig_base}/{ig_user_id}/media",
             {
                 "fields": "id,caption,media_type,media_url,thumbnail_url,permalink,"
                           "timestamp,like_count,comments_count",
                 "access_token": token
             }),
         'reach_data': (
-            f"{INSTAGRAM_CONFIG['graph_host']}/{INSTAGRAM_CONFIG['api_version']}/{ig_user_id}/insights",
+            f"{_ig_base}/{ig_user_id}/insights",
             {
                 "metric": "reach,profile_views,views,likes,comments,website_clicks,shares,saves,replies,reposts",
                 "metric_type": "total_value",
@@ -72,7 +59,7 @@ async def get_insights(
                 "access_token": token
             }),
         'demographic_data': (
-            f"{INSTAGRAM_CONFIG['graph_host']}/{INSTAGRAM_CONFIG['api_version']}/{ig_user_id}/insights",
+            f"{_ig_base}/{ig_user_id}/insights",
             {
                 "metric": "follower_demographics",
                 "breakdown": "age,gender,country",
@@ -82,7 +69,7 @@ async def get_insights(
             }
         ),
         'stories_data': (
-            f"{INSTAGRAM_CONFIG['graph_host']}/{INSTAGRAM_CONFIG['api_version']}/{ig_user_id}/stories",
+            f"{_ig_base}/{ig_user_id}/stories",
             {
                 "fields": "id,media_type,media_url,thumbnail_url,timestamp,owner,"
                           "caption,permalink,like_count,comments_count",
@@ -111,13 +98,13 @@ async def get_media_insights(
 
     urls = {
         'media_insights': (
-            f"{INSTAGRAM_CONFIG['graph_host']}/{INSTAGRAM_CONFIG['api_version']}/{media_id}/insights",
+            f"{_ig_base}/{media_id}/insights",
             {
                 "metric": "reach,saved,views,comments,shares",
                 "access_token": token
             }),
         'comments_insights': (
-            f"{INSTAGRAM_CONFIG['graph_host']}/{INSTAGRAM_CONFIG['api_version']}/{media_id}/comments",
+            f"{_ig_base}/{media_id}/comments",
             {
                 "fields": "id,text,username,timestamp,like_count,replies{id,text,username,timestamp}",
                 "access_token": token

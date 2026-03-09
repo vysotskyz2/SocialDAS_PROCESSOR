@@ -8,20 +8,19 @@ from src.infrastructure.logging_config import setup_logging
 from src.interfaces.api.routers.instagram import router as router_inst
 from src.interfaces.api.routers.tiktok import router as router_tt
 from src.interfaces.api.routers.youtube import router as router_yt
-
-_TOKEN_REFRESH_INTERVAL = 60 * 60  # every hour
+from src.settings import tiktok_settings
 
 
 async def _tiktok_token_refresh_loop() -> None:
-    """Фоновая задача: опережающее обновление токенов TikTok, истекающих в ближайшие 2 часа."""
+    """Фоновая задача: опережающее обновление токенов TikTok, истекающих в ближайшие N часов."""
     from src.infrastructure.tiktok_token_manager import refresh_all_expiring
-    from datetime import timedelta
+    buffer = timedelta(hours=tiktok_settings.proactive_refresh_buffer_hours)
     while True:
         try:
-            await refresh_all_expiring(buffer=timedelta(hours=2))
+            await refresh_all_expiring(buffer=buffer)
         except Exception:
             logger.exception("Ошибка в цикле обновления токенов TikTok")
-        await asyncio.sleep(_TOKEN_REFRESH_INTERVAL)
+        await asyncio.sleep(tiktok_settings.refresh_interval_seconds)
 
 
 @asynccontextmanager

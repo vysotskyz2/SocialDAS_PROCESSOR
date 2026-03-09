@@ -3,16 +3,17 @@ from loguru import logger
 
 from src.application.services.youtube_service import YouTubeService
 from src.infrastructure.repositories.youtube_repository import YouTubeRepository
-from src.infrastructure.tokens import get_youtube_token, TokenNotFoundError
+from src.infrastructure.tokens import get_youtube_credentials, TokenNotFoundError
+
 router = APIRouter(prefix="/api/v1", tags=["youtube"])
 
 
 def _get_service(yt_channel_id: str) -> YouTubeService:
     try:
-        api_key = get_youtube_token(yt_channel_id)
+        creds = get_youtube_credentials(yt_channel_id)
     except TokenNotFoundError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
-    return YouTubeService(YouTubeRepository(), api_key)
+    return YouTubeService(YouTubeRepository(), creds)
 
 
 @router.post("/analytics/youtube/{yt_channel_id}", summary="Trigger YouTube data collection")

@@ -51,7 +51,7 @@ class InstagramRepository:
             pg_insert(UserSnapshot)
             .values(**values)
             .on_conflict_do_update(
-                constraint="uix_user_snapshot_date",
+                constraint="uix_ig_user_snapshot_date",
                 set_={k: v for k, v in values.items() if k not in ("user_id", "date")},
             )
         )
@@ -143,7 +143,7 @@ class InstagramRepository:
             pg_insert(ProfileInsight)
             .values(**values)
             .on_conflict_do_update(
-                constraint="uix_profile_insight_user_date_period",
+                constraint="uix_ig_profile_insight_user_date_period",
                 set_={metric.name: total},
             )
         )

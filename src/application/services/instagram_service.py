@@ -5,10 +5,7 @@ from loguru import logger
 
 from src.infrastructure.repositories.instagram_repository import InstagramRepository
 from src.schemas.instagram import IGProfileResponse, IGMediaList, IGInsightList, IGStoryList
-
-GRAPH_HOST = "https://graph.facebook.com"
-API_VERSION = "v24.0"
-BASE = f"{GRAPH_HOST}/{API_VERSION}"
+from src.settings import instagram_settings
 
 
 class InstagramService:
@@ -19,20 +16,21 @@ class InstagramService:
 
     async def collect(self, ig_user_id: str, period: str = "day") -> None:
         """Загружает все данные Instagram-аккаунта и сохраняет их."""
-        async with AsyncClient(timeout=30.0) as client:
-            profile = await self._fetch_profile(client, ig_user_id)
+        base = f"{instagram_settings.graph_host}/{instagram_settings.api_version}"
+        async with AsyncClient(timeout=instagram_settings.http_timeout) as client:
+            profile = await self._fetch_profile(client, ig_user_id, base)
             user_id = await self.repo.upsert_user(profile)
             await self.repo.upsert_user_snapshot(user_id, profile)
 
-            await self._collect_media(client, ig_user_id, user_id)
-            await self._collect_insights(client, ig_user_id, user_id, period)
-            await self._collect_stories(client, ig_user_id, user_id)
+            await self._collect_media(client, ig_user_id, user_id, base)
+            await self._collect_insights(client, ig_user_id, user_id, period, base)
+            await self._collect_stories(client, ig_user_id, user_id, base)
 
         logger.info(f"Сбор данных Instagram завершён для {ig_user_id}")
 
-    async def _fetch_profile(self, client: AsyncClient, ig_user_id: str) -> IGProfileResponse:
+    async def _fetch_profile(self, client: AsyncClient, ig_user_id: str, base: str) -> IGProfileResponse:
         resp = await client.get(
-            f"{BASE}/{ig_user_id}",
+            f"{base}/{ig_user_id}",
             params={
                 "fields": "id,username,name,profile_picture_url,followers_count,follows_count,"
                           "media_count,biography,website",
@@ -42,9 +40,9 @@ class InstagramService:
         resp.raise_for_status()
         return IGProfileResponse.model_validate(resp.json())
 
-    async def _collect_media(self, client: AsyncClient, ig_user_id: str, user_id) -> None:
+    async def _collect_media(self, client: AsyncClient, ig_user_id: str, user_id, base: str) -> None:
         resp = await client.get(
-            f"{BASE}/{ig_user_id}/media",
+            f"{base}/{ig_user_id}/media",
             params={
                 "fields": "id,caption,media_type,media_url,thumbnail_url,permalink,"
                           "timestamp,like_count,comments_count",
@@ -59,9 +57,9 @@ class InstagramService:
             except Exception:
                 logger.exception(f"Ошибка сохранения поста {item.id}")
 
-    async def _collect_insights(self, client: AsyncClient, ig_user_id: str, user_id, period: str) -> None:
+    async def _collect_insights(self, client: AsyncClient, ig_user_id: str, user_id, period: str, base: str) -> None:
         resp = await client.get(
-            f"{BASE}/{ig_user_id}/insights",
+            f"{base}/{ig_user_id}/insights",
             params={
                 "metric": "reach,profile_views,views,likes,comments,website_clicks,shares,saves,replies,reposts",
                 "metric_type": "total_value",
@@ -78,9 +76,9 @@ class InstagramService:
             except Exception:
                 logger.exception(f"Ошибка сохранения метрики {metric.name}")
 
-    async def _collect_stories(self, client: AsyncClient, ig_user_id: str, user_id) -> None:
+    async def _collect_stories(self, client: AsyncClient, ig_user_id: str, user_id, base: str) -> None:
         resp = await client.get(
-            f"{BASE}/{ig_user_id}/stories",
+            f"{base}/{ig_user_id}/stories",
             params={
                 "fields": "id,media_type,media_url,thumbnail_url,timestamp,caption,permalink,"
                           "like_count,comments_count",

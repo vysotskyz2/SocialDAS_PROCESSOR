@@ -16,7 +16,7 @@ class InstagramConsumer(BaseConsumer):
         try:
             token = get_instagram_token(ig_user_id)
         except TokenNotFoundError:
-            logger.warning(f"Токен Instagram для аккаунта {ig_user_id} не найден — пропускаем")
+            logger.warning(f"Токен Instagram для аккаунта {ig_user_id} не найден")
             return
 
         service = InstagramService(InstagramRepository(), token)
