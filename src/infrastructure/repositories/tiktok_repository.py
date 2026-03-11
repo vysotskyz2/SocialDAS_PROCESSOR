@@ -1,18 +1,12 @@
 from datetime import datetime, timezone
 from uuid import UUID
-
-import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.infrastructure.models.tiktok import TikTokUser, TikTokUserSnapshot, TikTokVideo, TikTokVideoSnapshot
+from src.infrastructure.repositories.base import BaseRepository
 from src.schemas.tiktok import TTUserData, TTVideoItem
 
 
-class TikTokRepository:
-
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+class TikTokRepository(BaseRepository):
 
     async def upsert_user(self, data: TTUserData) -> UUID:
         values = {

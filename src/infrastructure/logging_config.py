@@ -1,14 +1,5 @@
-"""
-Настройка loguru для всего приложения.
-
-Вызовите setup_logging() один раз при старте (например, в lifespan FastAPI).
-Все сообщения стандартного logging (от сторонних библиотек) перехватываются
-и перенаправляются в loguru.
-"""
-
 import logging
 import sys
-
 from loguru import logger
 
 

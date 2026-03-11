@@ -1,15 +1,12 @@
-"""Instagram ORM models. analytics.py re-exports from here for backward compatibility."""
 import uuid
 from datetime import datetime
 from typing import Optional
 from enum import StrEnum
-
 from sqlalchemy import Text, String, DateTime, func, text, UniqueConstraint, Index, Integer
 from sqlalchemy.dialects.postgresql import UUID as Uuid
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey
-
 from src.infrastructure.models.base import Base
 
 

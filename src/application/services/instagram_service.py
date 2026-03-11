@@ -1,16 +1,13 @@
 from datetime import datetime, timezone
-
 from httpx import AsyncClient
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.infrastructure.repositories.instagram_repository import InstagramRepository
 from src.schemas.instagram import IGProfileResponse, IGMediaList, IGInsightList, IGStoryList
 from src.settings import instagram_settings
 
 
 class InstagramService:
-
     def __init__(self, session: AsyncSession, token: str):
         self.session = session
         self.token = token
@@ -19,10 +16,10 @@ class InstagramService:
         """Загружает все данные Instagram-аккаунта и сохраняет их в переданной сессии БД."""
         base = f"{instagram_settings.graph_host}/{instagram_settings.api_version}"
         async with AsyncClient(timeout=instagram_settings.http_timeout) as client:
-            profile = await self._fetch_profile(client, ig_user_id, base)
-            media_list = await self._fetch_media(client, ig_user_id, base)
-            insight_list = await self._fetch_insights(client, ig_user_id, period, base)
-            story_list = await self._fetch_stories(client, ig_user_id, base)
+            profile = await self.fetch_profile(client, ig_user_id, base)
+            media_list = await self.fetch_media(client, ig_user_id, base)
+            insight_list = await self.fetch_insights(client, ig_user_id, period, base)
+            story_list = await self.fetch_stories(client, ig_user_id, base)
 
         repo = InstagramRepository(self.session)
         user_id = await repo.upsert_user(profile)
@@ -49,8 +46,7 @@ class InstagramService:
 
         logger.info(f"Сбор данных Instagram завершён для {ig_user_id}")
 
-
-    async def _fetch_profile(self, client: AsyncClient, ig_user_id: str, base: str) -> IGProfileResponse:
+    async def fetch_profile(self, client: AsyncClient, ig_user_id: str, base: str) -> IGProfileResponse:
         resp = await client.get(
             f"{base}/{ig_user_id}",
             params={
@@ -62,7 +58,7 @@ class InstagramService:
         resp.raise_for_status()
         return IGProfileResponse.model_validate(resp.json())
 
-    async def _fetch_media(self, client: AsyncClient, ig_user_id: str, base: str) -> IGMediaList:
+    async def fetch_media(self, client: AsyncClient, ig_user_id: str, base: str) -> IGMediaList:
         resp = await client.get(
             f"{base}/{ig_user_id}/media",
             params={
@@ -74,7 +70,7 @@ class InstagramService:
         resp.raise_for_status()
         return IGMediaList.model_validate(resp.json())
 
-    async def _fetch_insights(self, client: AsyncClient, ig_user_id: str, period: str, base: str) -> IGInsightList:
+    async def fetch_insights(self, client: AsyncClient, ig_user_id: str, period: str, base: str) -> IGInsightList:
         resp = await client.get(
             f"{base}/{ig_user_id}/insights",
             params={
@@ -87,7 +83,7 @@ class InstagramService:
         resp.raise_for_status()
         return IGInsightList.model_validate(resp.json())
 
-    async def _fetch_stories(self, client: AsyncClient, ig_user_id: str, base: str) -> IGStoryList:
+    async def fetch_stories(self, client: AsyncClient, ig_user_id: str, base: str) -> IGStoryList:
         resp = await client.get(
             f"{base}/{ig_user_id}/stories",
             params={
@@ -98,4 +94,3 @@ class InstagramService:
         )
         resp.raise_for_status()
         return IGStoryList.model_validate(resp.json())
-

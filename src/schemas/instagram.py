@@ -1,9 +1,7 @@
-from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
+from src.schemas.base import BaseIGItem
 
-
-# --- Raw API response schemas ---
 
 class IGProfileResponse(BaseModel):
     id: str
@@ -17,16 +15,8 @@ class IGProfileResponse(BaseModel):
     website: Optional[str] = None
 
 
-class IGMediaItem(BaseModel):
-    id: str
-    caption: Optional[str] = None
-    media_type: Optional[str] = None
-    media_url: Optional[str] = None
-    thumbnail_url: Optional[str] = None
-    permalink: Optional[str] = None
-    timestamp: Optional[datetime] = None
-    like_count: Optional[int] = None
-    comments_count: Optional[int] = None
+class IGMediaItem(BaseIGItem):
+    pass
 
 
 class IGMediaList(BaseModel):
@@ -49,23 +39,13 @@ class IGInsightList(BaseModel):
     data: list[IGInsightMetric] = Field(default_factory=list)
 
 
-class IGStoryItem(BaseModel):
-    id: str
-    media_type: Optional[str] = None
-    media_url: Optional[str] = None
-    thumbnail_url: Optional[str] = None
-    timestamp: Optional[datetime] = None
-    like_count: Optional[int] = None
-    comments_count: Optional[int] = None
-    caption: Optional[str] = None
-    permalink: Optional[str] = None
+class IGStoryItem(BaseIGItem):
+    pass
 
 
 class IGStoryList(BaseModel):
     data: list[IGStoryItem] = Field(default_factory=list)
 
-
-# --- Normalized output (passed between service → repository) ---
 
 class NormalizedIGProfile(BaseModel):
     ig_id: str

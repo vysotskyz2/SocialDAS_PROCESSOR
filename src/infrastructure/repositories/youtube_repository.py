@@ -1,11 +1,8 @@
 from datetime import datetime, timezone
 from uuid import UUID
-
-import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.infrastructure.models.youtube import YouTubeChannel, YouTubeChannelSnapshot, YouTubeVideo, YouTubeVideoSnapshot
+from src.infrastructure.repositories.base import BaseRepository
 from src.schemas.youtube import YTChannelItem, YTVideoItem
 
 
@@ -16,10 +13,7 @@ def _safe_int(value: str | None) -> int | None:
         return None
 
 
-class YouTubeRepository:
-
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+class YouTubeRepository(BaseRepository):
 
     async def upsert_channel(self, item: YTChannelItem) -> UUID:
         snippet = item.snippet or {}
@@ -125,4 +119,3 @@ class YouTubeRepository:
         )
         await self._session.execute(stmt)
         await self._session.flush()
-

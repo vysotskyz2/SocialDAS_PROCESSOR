@@ -1,11 +1,8 @@
-import asyncio
 import json
 from abc import ABC, abstractmethod
-
 from aiokafka import AIOKafkaConsumer
 from loguru import logger
 from pydantic import ValidationError
-
 from src.schemas.kafka import KafkaMessage
 from src.settings import kafka_settings
 
@@ -41,15 +38,14 @@ class BaseConsumer(ABC):
     async def _handle(self, payload: dict) -> None:
         try:
             message = KafkaMessage.model_validate(payload)
+            await self.process_message(message)
         except ValidationError as exc:
             logger.error(f"Некорректное сообщение Kafka в топике '{self.topic}': {exc} | payload={payload}")
             return
-        try:
-            await self.process_message(message)
         except Exception:
             logger.exception(
                 f"Необработанная ошибка при обработке сообщения для аккаунта {payload.get('account_id')} в топике '{self.topic}'"
             )
 
     @abstractmethod
-    async def process_message(self, message: KafkaMessage) -> None: ...
+    async def process_message(self, message: KafkaMessage) -> None: pass

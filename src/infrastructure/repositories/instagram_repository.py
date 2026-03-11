@@ -1,21 +1,15 @@
 from datetime import datetime, timezone
 from uuid import UUID
-
-import sqlalchemy as sa
 from loguru import logger
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.infrastructure.models.instagram import (
     User, UserSnapshot, Post, Story, ProfileInsight, MediaType, InsightPeriod,
 )
+from src.infrastructure.repositories.base import BaseRepository
 from src.schemas.instagram import IGProfileResponse, IGMediaItem, IGStoryItem, IGInsightMetric
 
 
-class InstagramRepository:
-
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+class InstagramRepository(BaseRepository):
 
     async def upsert_user(self, profile: IGProfileResponse) -> UUID:
         values = {
@@ -150,4 +144,3 @@ class InstagramRepository:
         )
         await self._session.execute(stmt)
         await self._session.flush()
-
