@@ -1,15 +1,12 @@
 from datetime import datetime, timezone
 from uuid import UUID
-
-from loguru import logger
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-from src.infrastructure.database import async_session_factory
 from src.infrastructure.models.tiktok import TikTokUser, TikTokUserSnapshot, TikTokVideo, TikTokVideoSnapshot
-from src.schemas.tiktok import TTUserData, TTVideoItem
+from src.infrastructure.repositories.base import BaseRepository
+from src.infrastructure.schemas.tiktok import TTUserData, TTVideoItem
 
 
-class TikTokRepository:
+class TikTokRepository(BaseRepository):
 
     async def upsert_user(self, data: TTUserData) -> UUID:
         values = {
@@ -31,10 +28,9 @@ class TikTokRepository:
             )
             .returning(TikTokUser.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_user_snapshot(self, user_id: UUID, data: TTUserData) -> None:
         today = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -53,10 +49,10 @@ class TikTokRepository:
                 constraint="uix_tt_user_snapshot_date",
                 set_={k: v for k, v in values.items() if k not in ("user_id", "date")},
             )
+            .returning(TikTokUserSnapshot.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
 
     async def upsert_video(self, user_id: UUID, item: TTVideoItem) -> UUID:
         create_time = (
@@ -86,10 +82,9 @@ class TikTokRepository:
             )
             .returning(TikTokVideo.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_video_snapshot(self, video_id: UUID, item: TTVideoItem) -> None:
         today = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -108,7 +103,8 @@ class TikTokRepository:
                 constraint="uix_tt_video_snapshot_date",
                 set_={k: v for k, v in values.items() if k not in ("video_id", "date")},
             )
+            .returning(TikTokVideoSnapshot.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
+

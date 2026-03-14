@@ -1,23 +1,34 @@
 from loguru import logger
-
+from google.auth.transport.requests import Request as GoogleRequest
+import google.oauth2.credentials
 from src.application.services.youtube_service import YouTubeService
+from src.infrastructure.database import async_session_factory
 from src.infrastructure.kafka.base_consumer import BaseConsumer
-from src.infrastructure.repositories.youtube_repository import YouTubeRepository
-from src.infrastructure.tokens import get_youtube_token, TokenNotFoundError
-from src.schemas.kafka import KafkaMessage
-from src.settings import kafka_settings
+from src.infrastructure.schemas.kafka import KafkaMessage
+from src.settings import settings
 
 
 class YouTubeConsumer(BaseConsumer):
-    topic = kafka_settings.topic_youtube
+    topic = settings.kafka_settings.topic_youtube
 
     async def process_message(self, message: KafkaMessage) -> None:
         yt_channel_id = message.account_id
-        try:
-            api_key = get_youtube_token(yt_channel_id)
-        except TokenNotFoundError:
-            logger.warning("API-ключ YouTube для канала {} не найден — пропускаем", yt_channel_id)
-            return
 
-        service = YouTubeService(YouTubeRepository(), api_key)
-        await service.collect(yt_channel_id)
+        try:
+            creds = google.oauth2.credentials.Credentials(
+                token=message.access_token,
+                refresh_token=message.refresh_token,
+                token_uri=settings.youtube_settings.token_uri,
+                client_id=settings.youtube_settings.client_id,
+                client_secret=settings.youtube_settings.client_secret,
+            )
+
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(GoogleRequest())
+
+            async with async_session_factory() as session:
+                async with session.begin():
+                    await YouTubeService(session, creds).collect(yt_channel_id)
+        except RuntimeError as exc:
+            logger.error(f"Ошибка токена YouTube для {yt_channel_id}: {exc}")

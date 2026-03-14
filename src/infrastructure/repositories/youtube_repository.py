@@ -1,22 +1,12 @@
 from datetime import datetime, timezone
 from uuid import UUID
-
-from loguru import logger
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-from src.infrastructure.database import async_session_factory
 from src.infrastructure.models.youtube import YouTubeChannel, YouTubeChannelSnapshot, YouTubeVideo, YouTubeVideoSnapshot
-from src.schemas.youtube import YTChannelItem, YTVideoItem
+from src.infrastructure.repositories.base import BaseRepository
+from src.infrastructure.schemas.youtube import YTChannelItem, YTVideoItem
 
 
-def _safe_int(value: str | None) -> int | None:
-    try:
-        return int(value) if value is not None else None
-    except (ValueError, TypeError):
-        return None
-
-
-class YouTubeRepository:
+class YouTubeRepository(BaseRepository):
 
     async def upsert_channel(self, item: YTChannelItem) -> UUID:
         snippet = item.snippet or {}
@@ -45,10 +35,9 @@ class YouTubeRepository:
             )
             .returning(YouTubeChannel.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_channel_snapshot(self, channel_id: UUID, item: YTChannelItem) -> None:
         stats = item.statistics
@@ -56,9 +45,9 @@ class YouTubeRepository:
         values = {
             "channel_id": channel_id,
             "date": today,
-            "subscriber_count": _safe_int(stats.subscriberCount) if stats else None,
-            "video_count": _safe_int(stats.videoCount) if stats else None,
-            "view_count": _safe_int(stats.viewCount) if stats else None,
+            "subscriber_count": self._safe_int(stats.subscriberCount) if stats else None,
+            "video_count": self._safe_int(stats.videoCount) if stats else None,
+            "view_count": self._safe_int(stats.viewCount) if stats else None,
         }
         stmt = (
             pg_insert(YouTubeChannelSnapshot)
@@ -67,10 +56,10 @@ class YouTubeRepository:
                 constraint="uix_yt_channel_snapshot_date",
                 set_={k: v for k, v in values.items() if k not in ("channel_id", "date")},
             )
+            .returning(YouTubeChannelSnapshot.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
 
     async def upsert_video(self, channel_id: UUID, item: YTVideoItem) -> UUID:
         snippet = item.snippet
@@ -98,10 +87,9 @@ class YouTubeRepository:
             )
             .returning(YouTubeVideo.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_video_snapshot(self, video_id: UUID, item: YTVideoItem) -> None:
         stats = item.statistics
@@ -109,9 +97,9 @@ class YouTubeRepository:
         values = {
             "video_id": video_id,
             "date": today,
-            "view_count": _safe_int(stats.viewCount) if stats else None,
-            "like_count": _safe_int(stats.likeCount) if stats else None,
-            "comment_count": _safe_int(stats.commentCount) if stats else None,
+            "view_count": self._safe_int(stats.viewCount) if stats else None,
+            "like_count": self._safe_int(stats.likeCount) if stats else None,
+            "comment_count": self._safe_int(stats.commentCount) if stats else None,
         }
         stmt = (
             pg_insert(YouTubeVideoSnapshot)
@@ -120,7 +108,14 @@ class YouTubeRepository:
                 constraint="uix_yt_video_snapshot_date",
                 set_={k: v for k, v in values.items() if k not in ("video_id", "date")},
             )
+            .returning(YouTubeVideoSnapshot.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
+
+    @staticmethod
+    def _safe_int(value: str | None) -> int | None:
+        try:
+            return int(value) if value is not None else None
+        except (ValueError, TypeError):
+            return None

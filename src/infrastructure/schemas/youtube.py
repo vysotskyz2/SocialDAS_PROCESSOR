@@ -1,9 +1,8 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
+from src.infrastructure.schemas.base import BaseYTStatistic, BaseYTSnippet
 
-
-# --- Raw API response schemas (YouTube Data API v3) ---
 
 class YTThumbnail(BaseModel):
     url: Optional[str] = None
@@ -11,17 +10,12 @@ class YTThumbnail(BaseModel):
     height: Optional[int] = None
 
 
-class YTChannelSnippet(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
+class YTChannelSnippet(BaseYTSnippet):
     customUrl: Optional[str] = None
-    publishedAt: Optional[datetime] = None
-    thumbnails: Optional[dict] = None
     country: Optional[str] = None
 
 
-class YTChannelStatistics(BaseModel):
-    viewCount: Optional[str] = None
+class YTChannelStatistics(BaseYTStatistic):
     subscriberCount: Optional[str] = None
     hiddenSubscriberCount: Optional[bool] = None
     videoCount: Optional[str] = None
@@ -37,17 +31,12 @@ class YTChannelListResponse(BaseModel):
     items: list[YTChannelItem] = Field(default_factory=list)
 
 
-class YTVideoSnippet(BaseModel):
-    publishedAt: Optional[datetime] = None
+class YTVideoSnippet(BaseYTSnippet):
     channelId: Optional[str] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
-    thumbnails: Optional[dict] = None
     channelTitle: Optional[str] = None
 
 
-class YTVideoStatistics(BaseModel):
-    viewCount: Optional[str] = None
+class YTVideoStatistics(BaseYTStatistic):
     likeCount: Optional[str] = None
     favoriteCount: Optional[str] = None
     commentCount: Optional[str] = None
@@ -78,8 +67,6 @@ class YTSearchResponse(BaseModel):
     items: list[YTSearchItem] = Field(default_factory=list)
     nextPageToken: Optional[str] = None
 
-
-# --- Normalized output ---
 
 class NormalizedYTChannel(BaseModel):
     yt_channel_id: str

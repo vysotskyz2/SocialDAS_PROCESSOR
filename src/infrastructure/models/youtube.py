@@ -1,17 +1,15 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-
 from sqlalchemy import Text, String, DateTime, func, text, UniqueConstraint, Index, BigInteger
 from sqlalchemy.dialects.postgresql import UUID as Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey
-
 from src.infrastructure.models.base import Base
 
 
 class YouTubeChannel(Base):
-    __tablename__ = "youtube_channels"
+    __tablename__ = "yt_channels"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
@@ -35,13 +33,13 @@ class YouTubeChannel(Base):
 
 
 class YouTubeChannelSnapshot(Base):
-    __tablename__ = "youtube_channel_snapshots"
+    __tablename__ = "yt_channel_snapshots"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
     )
     channel_id: Mapped[Uuid] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("youtube_channels.id", ondelete="CASCADE"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("yt_channels.id", ondelete="CASCADE"), nullable=False
     )
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     subscriber_count: Mapped[Optional[int]] = mapped_column(BigInteger)
@@ -58,14 +56,14 @@ class YouTubeChannelSnapshot(Base):
 
 
 class YouTubeVideo(Base):
-    __tablename__ = "youtube_videos"
+    __tablename__ = "yt_videos"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
     )
     yt_video_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     channel_id: Mapped[Uuid] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("youtube_channels.id", ondelete="CASCADE"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("yt_channels.id", ondelete="CASCADE"), nullable=False
     )
     title: Mapped[Optional[str]] = mapped_column(Text)
     description: Mapped[Optional[str]] = mapped_column(Text)
@@ -84,13 +82,13 @@ class YouTubeVideo(Base):
 
 
 class YouTubeVideoSnapshot(Base):
-    __tablename__ = "youtube_video_snapshots"
+    __tablename__ = "yt_video_snapshots"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
     )
     video_id: Mapped[Uuid] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("youtube_videos.id", ondelete="CASCADE"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("yt_videos.id", ondelete="CASCADE"), nullable=False
     )
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     view_count: Mapped[Optional[int]] = mapped_column(BigInteger)

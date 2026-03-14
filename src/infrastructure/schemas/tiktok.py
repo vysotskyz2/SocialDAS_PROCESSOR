@@ -1,9 +1,6 @@
-from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
 
-
-# --- Raw API response schemas ---
 
 class TTUserData(BaseModel):
     open_id: str
@@ -17,8 +14,12 @@ class TTUserData(BaseModel):
     video_count: Optional[int] = None
 
 
+class TTUserContainer(BaseModel):
+    user: Optional[TTUserData] = None
+
+
 class TTUserInfoResponse(BaseModel):
-    data: Optional[TTUserData] = None
+    data: Optional[TTUserContainer] = None
     error: Optional[dict] = None
 
 
@@ -47,8 +48,6 @@ class TTVideoListResponse(BaseModel):
     data: Optional[TTVideoListData] = None
     error: Optional[dict] = None
 
-
-# --- Normalized output ---
 
 class NormalizedTTUser(BaseModel):
     tt_open_id: str

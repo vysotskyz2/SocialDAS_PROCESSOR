@@ -1,13 +1,10 @@
-import asyncio
 import json
 from abc import ABC, abstractmethod
-
 from aiokafka import AIOKafkaConsumer
 from loguru import logger
 from pydantic import ValidationError
-
-from src.schemas.kafka import KafkaMessage
-from src.settings import kafka_settings
+from src.infrastructure.schemas.kafka import KafkaMessage
+from src.settings import settings
 
 
 class BaseConsumer(ABC):
@@ -18,8 +15,8 @@ class BaseConsumer(ABC):
     def __init__(self) -> None:
         self._consumer = AIOKafkaConsumer(
             self.topic,
-            bootstrap_servers=kafka_settings.bootstrap_servers,
-            group_id=kafka_settings.group_id,
+            bootstrap_servers=settings.kafka_settings.bootstrap_servers,
+            group_id=settings.kafka_settings.group_id,
             value_deserializer=lambda m: json.loads(m.decode("utf-8")),
             auto_offset_reset="earliest",
             enable_auto_commit=True,
@@ -27,13 +24,13 @@ class BaseConsumer(ABC):
 
     async def run(self) -> None:
         await self._consumer.start()
-        logger.info("Консьюмер запущен для топика '{}'", self.topic)
+        logger.info(f"Консьюмер запущен для топика '{self.topic}'")
         try:
             async for msg in self._consumer:
                 await self._handle(msg.value)
         finally:
             await self._consumer.stop()
-            logger.info("Консьюмер остановлен для топика '{}'", self.topic)
+            logger.info(f"Консьюмер остановлен для топика '{self.topic}'")
 
     async def stop(self) -> None:
         await self._consumer.stop()
@@ -41,17 +38,14 @@ class BaseConsumer(ABC):
     async def _handle(self, payload: dict) -> None:
         try:
             message = KafkaMessage.model_validate(payload)
-        except ValidationError as exc:
-            logger.error("Некорректное сообщение Kafka в топике '{}': {} | payload={}", self.topic, exc, payload)
-            return
-        try:
             await self.process_message(message)
+        except ValidationError as exc:
+            logger.error(f"Некорректное сообщение Kafka в топике '{self.topic}': {exc} | payload={payload}")
+            return
         except Exception:
             logger.exception(
-                "Необработанная ошибка при обработке сообщения для аккаунта {} в топике '{}'",
-                payload.get("account_id"),
-                self.topic,
+                f"Необработанная ошибка при обработке сообщения для аккаунта {payload.get('account_id')} в топике '{self.topic}'"
             )
 
     @abstractmethod
-    async def process_message(self, message: KafkaMessage) -> None: ...
+    async def process_message(self, message: KafkaMessage) -> None: pass

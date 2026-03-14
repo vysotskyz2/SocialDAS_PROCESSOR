@@ -1,15 +1,12 @@
-"""Instagram ORM models. analytics.py re-exports from here for backward compatibility."""
 import uuid
 from datetime import datetime
 from typing import Optional
 from enum import StrEnum
-
 from sqlalchemy import Text, String, DateTime, func, text, UniqueConstraint, Index, Integer
 from sqlalchemy.dialects.postgresql import UUID as Uuid
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey
-
 from src.infrastructure.models.base import Base
 
 
@@ -26,7 +23,7 @@ class InsightPeriod(StrEnum):
 
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "ig_users"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True),
@@ -50,13 +47,13 @@ class User(Base):
 
 
 class UserSnapshot(Base):
-    __tablename__ = "user_snapshots"
+    __tablename__ = "ig_user_snapshots"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
     )
     user_id: Mapped[Uuid] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("ig_users.id", ondelete="CASCADE"), nullable=False
     )
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     followers_count: Mapped[Optional[int]] = mapped_column(Integer)
@@ -65,22 +62,22 @@ class UserSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("user_id", "date", name="uix_user_snapshot_date"),
-        Index("ix_user_snapshots_user_id_date", "user_id", "date"),
+        UniqueConstraint("user_id", "date", name="uix_ig_user_snapshot_date"),
+        Index("ix_ig_user_snapshots_user_id_date", "user_id", "date"),
     )
 
     user: Mapped["User"] = relationship(back_populates="snapshots")
 
 
 class Post(Base):
-    __tablename__ = "posts"
+    __tablename__ = "ig_posts"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
     )
     ig_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     user_id: Mapped[Uuid] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("ig_users.id", ondelete="CASCADE"), nullable=False
     )
     media_type: Mapped[Optional[MediaType]] = mapped_column(
         PgEnum(MediaType, name="mediatype_enum", create_type=True)
@@ -95,20 +92,20 @@ class Post(Base):
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (Index("ix_posts_user_id_timestamp", "user_id", "timestamp"),)
+    __table_args__ = (Index("ix_ig_posts_user_id_timestamp", "user_id", "timestamp"),)
 
     user: Mapped["User"] = relationship(back_populates="posts")
     insights: Mapped[list["PostInsight"]] = relationship(back_populates="post", cascade="all, delete-orphan")
 
 
 class PostInsight(Base):
-    __tablename__ = "post_insights"
+    __tablename__ = "ig_post_insights"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
     )
     post_id: Mapped[Uuid] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("ig_posts.id", ondelete="CASCADE"), nullable=False
     )
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     reach: Mapped[Optional[int]] = mapped_column(Integer)
@@ -118,22 +115,22 @@ class PostInsight(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("post_id", "date", name="uix_post_insight_date"),
-        Index("ix_post_insights_post_id_date", "post_id", "date"),
+        UniqueConstraint("post_id", "date", name="uix_ig_post_insight_date"),
+        Index("ix_ig_post_insights_post_id_date", "post_id", "date"),
     )
 
     post: Mapped["Post"] = relationship(back_populates="insights")
 
 
 class Story(Base):
-    __tablename__ = "stories"
+    __tablename__ = "ig_stories"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
     )
     ig_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     user_id: Mapped[Uuid] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("ig_users.id", ondelete="CASCADE"), nullable=False
     )
     media_type: Mapped[Optional[MediaType]] = mapped_column(
         PgEnum(MediaType, name="mediatype_enum", create_type=True)
@@ -148,19 +145,19 @@ class Story(Base):
     last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (Index("ix_stories_user_id_timestamp", "user_id", "timestamp"),)
+    __table_args__ = (Index("ix_ig_stories_user_id_timestamp", "user_id", "timestamp"),)
 
     user: Mapped["User"] = relationship(back_populates="stories")
 
 
 class ProfileInsight(Base):
-    __tablename__ = "profile_insights"
+    __tablename__ = "ig_profile_insights"
 
     id: Mapped[Uuid] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
     )
     user_id: Mapped[Uuid] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("ig_users.id", ondelete="CASCADE"), nullable=False
     )
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     period: Mapped[InsightPeriod] = mapped_column(
@@ -179,8 +176,8 @@ class ProfileInsight(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("user_id", "date", "period", name="uix_profile_insight_user_date_period"),
-        Index("ix_profile_insights_user_id_date_period", "user_id", "date", "period"),
+        UniqueConstraint("user_id", "date", "period", name="uix_ig_profile_insight_user_date_period"),
+        Index("ix_ig_profile_insights_user_id_date_period", "user_id", "date", "period"),
     )
 
     user: Mapped["User"] = relationship(back_populates="profile_insights")

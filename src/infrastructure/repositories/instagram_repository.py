@@ -1,21 +1,19 @@
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from uuid import UUID
-
 from loguru import logger
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-from src.infrastructure.database import async_session_factory
 from src.infrastructure.models.instagram import (
-    User, UserSnapshot, Post, PostInsight, Story, ProfileInsight, MediaType, InsightPeriod,
+    User, UserSnapshot, Post, Story, ProfileInsight, PostInsight, MediaType, InsightPeriod,
 )
-from src.schemas.instagram import IGProfileResponse, IGMediaItem, IGStoryItem, IGInsightMetric
+from src.infrastructure.repositories.base import BaseRepository
+from src.infrastructure.schemas.instagram import (
+    IGProfileResponse, IGMediaItem, IGStoryItem, IGInsightMetric, IGPostInsightMetric,
+)
 
 
-class InstagramRepository:
+class InstagramRepository(BaseRepository):
 
     async def upsert_user(self, profile: IGProfileResponse) -> UUID:
-        """Вставляет или обновляет пользователя Instagram по ig_id. Возвращает внутренний UUID."""
         values = {
             "ig_id": profile.id,
             "username": profile.username,
@@ -33,10 +31,9 @@ class InstagramRepository:
             )
             .returning(User.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_user_snapshot(self, user_id: UUID, profile: IGProfileResponse) -> None:
         today = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -51,13 +48,13 @@ class InstagramRepository:
             pg_insert(UserSnapshot)
             .values(**values)
             .on_conflict_do_update(
-                constraint="uix_user_snapshot_date",
+                constraint="uix_ig_user_snapshot_date",
                 set_={k: v for k, v in values.items() if k not in ("user_id", "date")},
             )
+            .returning(UserSnapshot.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
 
     async def upsert_post(self, user_id: UUID, item: IGMediaItem) -> UUID:
         try:
@@ -87,10 +84,9 @@ class InstagramRepository:
             )
             .returning(Post.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                result = await session.execute(stmt)
-                return result.scalar_one()
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return result.scalar_one()
 
     async def upsert_story(self, user_id: UUID, item: IGStoryItem) -> None:
         try:
@@ -118,10 +114,39 @@ class InstagramRepository:
                 index_elements=["ig_id"],
                 set_={k: v for k, v in values.items() if k not in ("ig_id", "user_id")},
             )
+            .returning(Story.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()
+
+    async def upsert_post_insight(
+        self, post_id: UUID, metric: IGPostInsightMetric, snapshot_date: datetime
+    ) -> None:
+        allowed_columns = {"reach", "saved", "views", "shares"}
+        if metric.name not in allowed_columns:
+            logger.warning(f"Неизвестная метрика поста: {metric.name}, пропускаем")
+            return
+
+        value: int = 0
+        if metric.values:
+            value = metric.values[0].value
+
+        values = {
+            "post_id": post_id,
+            "date": snapshot_date,
+            metric.name: value,
+        }
+        stmt = (
+            pg_insert(PostInsight)
+            .values(**values)
+            .on_conflict_do_update(
+                constraint="uix_ig_post_insight_date",
+                set_={metric.name: value},
+            )
+            .returning(PostInsight.id)
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
 
     async def upsert_profile_insight(
         self, user_id: UUID, metric: IGInsightMetric, snapshot_date: datetime
@@ -129,7 +154,7 @@ class InstagramRepository:
         try:
             period = InsightPeriod(metric.period)
         except ValueError:
-            logger.warning("Неизвестный период метрики: {}", metric.period)
+            logger.warning(f"Неизвестный период метрики: {metric.period}")
             return
 
         total = (metric.total_value or {}).get("value", 0)
@@ -143,10 +168,10 @@ class InstagramRepository:
             pg_insert(ProfileInsight)
             .values(**values)
             .on_conflict_do_update(
-                constraint="uix_profile_insight_user_date_period",
+                constraint="uix_ig_profile_insight_user_date_period",
                 set_={metric.name: total},
             )
+            .returning(ProfileInsight.id)
         )
-        async with async_session_factory() as session:
-            async with session.begin():
-                await session.execute(stmt)
+        await self._session.execute(stmt)
+        await self._session.flush()

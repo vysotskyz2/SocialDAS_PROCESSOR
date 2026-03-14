@@ -1,38 +1,71 @@
 from datetime import datetime, timezone
-
 from httpx import AsyncClient
 from loguru import logger
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.repositories.instagram_repository import InstagramRepository
-from src.schemas.instagram import IGProfileResponse, IGMediaList, IGInsightList, IGStoryList
-
-GRAPH_HOST = "https://graph.facebook.com"
-API_VERSION = "v24.0"
-BASE = f"{GRAPH_HOST}/{API_VERSION}"
+from src.infrastructure.schemas.instagram import (
+    IGProfileResponse, IGMediaList, IGInsightList, IGStoryList, IGPostInsightList,
+)
+from src.settings import settings
 
 
 class InstagramService:
-
-    def __init__(self, repository: InstagramRepository, token: str):
-        self.repo = repository
+    def __init__(self, session: AsyncSession, token: str):
+        self.session = session
         self.token = token
 
     async def collect(self, ig_user_id: str, period: str = "day") -> None:
-        """Загружает все данные Instagram-аккаунта и сохраняет их."""
-        async with AsyncClient(timeout=30.0) as client:
-            profile = await self._fetch_profile(client, ig_user_id)
-            user_id = await self.repo.upsert_user(profile)
-            await self.repo.upsert_user_snapshot(user_id, profile)
+        """Загружает все данные Instagram-аккаунта и сохраняет их в переданной сессии БД."""
+        base = f"{settings.instagram_settings.graph_host}/{settings.instagram_settings.api_version}"
+        snapshot_date = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
-            await self._collect_media(client, ig_user_id, user_id)
-            await self._collect_insights(client, ig_user_id, user_id, period)
-            await self._collect_stories(client, ig_user_id, user_id)
+        async with AsyncClient(timeout=settings.instagram_settings.http_timeout) as client:
+            profile = await self.fetch_profile(client, ig_user_id, base)
+            media_list = await self.fetch_media(client, ig_user_id, base)
+            insight_list = await self.fetch_insights(client, ig_user_id, period, base)
+            story_list = await self.fetch_stories(client, ig_user_id, base)
 
-        logger.info("Сбор данных Instagram завершён для {}", ig_user_id)
+            post_insights_map: dict[str, IGPostInsightList] = {}
+            for item in media_list.data:
+                try:
+                    post_insights_map[item.id] = await self.fetch_post_insights(client, item.id, base)
+                except Exception:
+                    logger.exception(f"Ошибка загрузки инсайтов поста {item.id}")
 
-    async def _fetch_profile(self, client: AsyncClient, ig_user_id: str) -> IGProfileResponse:
+        repo = InstagramRepository(self.session)
+        user_id = await repo.upsert_user(profile)
+        await repo.upsert_user_snapshot(user_id, profile)
+
+        for item in media_list.data:
+            try:
+                post_id = await repo.upsert_post(user_id, item)
+            except Exception:
+                logger.exception(f"Ошибка сохранения поста {item.id}")
+                continue
+
+            for metric in post_insights_map.get(item.id, IGPostInsightList()).data:
+                try:
+                    await repo.upsert_post_insight(post_id, metric, snapshot_date)
+                except Exception:
+                    logger.exception(f"Ошибка сохранения инсайта '{metric.name}' для поста {item.id}")
+
+        for metric in insight_list.data:
+            try:
+                await repo.upsert_profile_insight(user_id, metric, snapshot_date)
+            except Exception:
+                logger.exception(f"Ошибка сохранения метрики {metric.name}")
+
+        for item in story_list.data:
+            try:
+                await repo.upsert_story(user_id, item)
+            except Exception:
+                logger.exception(f"Ошибка сохранения сторис {item.id}")
+
+        logger.info(f"Сбор данных Instagram завершён для {ig_user_id}")
+
+    async def fetch_profile(self, client: AsyncClient, ig_user_id: str, base: str) -> IGProfileResponse:
         resp = await client.get(
-            f"{BASE}/{ig_user_id}",
+            f"{base}/{ig_user_id}",
             params={
                 "fields": "id,username,name,profile_picture_url,followers_count,follows_count,"
                           "media_count,biography,website",
@@ -42,9 +75,9 @@ class InstagramService:
         resp.raise_for_status()
         return IGProfileResponse.model_validate(resp.json())
 
-    async def _collect_media(self, client: AsyncClient, ig_user_id: str, user_id) -> None:
+    async def fetch_media(self, client: AsyncClient, ig_user_id: str, base: str) -> IGMediaList:
         resp = await client.get(
-            f"{BASE}/{ig_user_id}/media",
+            f"{base}/{ig_user_id}/media",
             params={
                 "fields": "id,caption,media_type,media_url,thumbnail_url,permalink,"
                           "timestamp,like_count,comments_count",
@@ -52,16 +85,11 @@ class InstagramService:
             },
         )
         resp.raise_for_status()
-        media_list = IGMediaList.model_validate(resp.json())
-        for item in media_list.data:
-            try:
-                await self.repo.upsert_post(user_id, item)
-            except Exception:
-                logger.exception("Ошибка сохранения поста {}", item.id)
+        return IGMediaList.model_validate(resp.json())
 
-    async def _collect_insights(self, client: AsyncClient, ig_user_id: str, user_id, period: str) -> None:
+    async def fetch_insights(self, client: AsyncClient, ig_user_id: str, period: str, base: str) -> IGInsightList:
         resp = await client.get(
-            f"{BASE}/{ig_user_id}/insights",
+            f"{base}/{ig_user_id}/insights",
             params={
                 "metric": "reach,profile_views,views,likes,comments,website_clicks,shares,saves,replies,reposts",
                 "metric_type": "total_value",
@@ -70,17 +98,11 @@ class InstagramService:
             },
         )
         resp.raise_for_status()
-        insight_list = IGInsightList.model_validate(resp.json())
-        snapshot_date = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        for metric in insight_list.data:
-            try:
-                await self.repo.upsert_profile_insight(user_id, metric, snapshot_date)
-            except Exception:
-                logger.exception("Ошибка сохранения метрики {}", metric.name)
+        return IGInsightList.model_validate(resp.json())
 
-    async def _collect_stories(self, client: AsyncClient, ig_user_id: str, user_id) -> None:
+    async def fetch_stories(self, client: AsyncClient, ig_user_id: str, base: str) -> IGStoryList:
         resp = await client.get(
-            f"{BASE}/{ig_user_id}/stories",
+            f"{base}/{ig_user_id}/stories",
             params={
                 "fields": "id,media_type,media_url,thumbnail_url,timestamp,caption,permalink,"
                           "like_count,comments_count",
@@ -88,9 +110,18 @@ class InstagramService:
             },
         )
         resp.raise_for_status()
-        story_list = IGStoryList.model_validate(resp.json())
-        for item in story_list.data:
-            try:
-                await self.repo.upsert_story(user_id, item)
-            except Exception:
-                logger.exception("Ошибка сохранения сторис {}", item.id)
+        return IGStoryList.model_validate(resp.json())
+
+    async def fetch_post_insights(
+        self, client: AsyncClient, ig_media_id: str, base: str
+    ) -> IGPostInsightList:
+        """Загружает lifetime-инсайты одного поста: reach, saved, views, shares."""
+        resp = await client.get(
+            f"{base}/{ig_media_id}/insights",
+            params={
+                "metric": "reach,saved,views,shares",
+                "access_token": self.token,
+            },
+        )
+        resp.raise_for_status()
+        return IGPostInsightList.model_validate(resp.json())
