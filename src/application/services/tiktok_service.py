@@ -3,8 +3,8 @@ from httpx import AsyncClient
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.repositories.tiktok_repository import TikTokRepository
-from src.schemas.tiktok import TTUserInfoResponse, TTVideoListResponse
-from src.settings import tiktok_settings
+from src.infrastructure.schemas.tiktok import TTUserInfoResponse, TTVideoListResponse
+from src.settings import settings
 
 VIDEO_FIELDS = ("id,title,video_description,duration,cover_image_url,share_url,"
                 "like_count,comment_count,share_count,view_count,create_time")
@@ -19,8 +19,7 @@ class TikTokService:
     @property
     def _headers(self) -> dict:
         return {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.token}"
         }
 
     async def _get(self, client: AsyncClient, url: str, **kwargs) -> httpx.Response:
@@ -35,7 +34,7 @@ class TikTokService:
 
     async def collect(self, tt_user_id: str) -> None:
         """Загружает профиль и список видео TikTok-аккаунта, сохраняет в БД через переданную сессию."""
-        async with AsyncClient(timeout=tiktok_settings.http_timeout) as client:
+        async with AsyncClient(timeout=settings.tiktok_settings.http_timeout) as client:
             user_data = await self.fetch_user(client)
             if not user_data:
                 logger.warning(f"Данные пользователя TikTok {tt_user_id} не получены")
@@ -57,17 +56,17 @@ class TikTokService:
     async def fetch_user(self, client: AsyncClient):
         resp = await self._get(
             client,
-            f"{tiktok_settings.base_url}/user/info/",
+            f"{settings.tiktok_settings.base_url}/user/info/",
             params={"fields": "open_id,union_id,avatar_url,display_name,bio_description,"
                               "follower_count,following_count,likes_count,video_count"},
         )
         parsed = TTUserInfoResponse.model_validate(resp.json())
-        return parsed.data
+        return parsed.data.user if parsed.data else None
 
     async def fetch_videos(self, client: AsyncClient, cursor: int = 0, max_count: int = 20) -> list:
         resp = await self._post(
             client,
-            f"{tiktok_settings.base_url}/video/list/",
+            f"{settings.tiktok_settings.base_url}/video/list/",
             params={"fields": VIDEO_FIELDS},
             json={"max_count": max_count, "cursor": cursor},
         )

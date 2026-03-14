@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
-from src.schemas.base import BaseYTStatistic, BaseYTSnippet
+from src.infrastructure.schemas.base import BaseYTStatistic, BaseYTSnippet
 
 
 class YTThumbnail(BaseModel):

@@ -24,7 +24,10 @@ async def lifespan(app: FastAPI):
     logger.info("Kafka-консьюмеры и цикл обновления токенов остановлены")
 
 
-app = FastAPI(lifespan=lifespan, docs_url=None)
+app = FastAPI(
+    lifespan=lifespan,
+    docs_url=None
+)
 
 
 @app.get("/health")

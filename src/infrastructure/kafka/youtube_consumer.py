@@ -4,22 +4,23 @@ import google.oauth2.credentials
 from src.application.services.youtube_service import YouTubeService
 from src.infrastructure.database import async_session_factory
 from src.infrastructure.kafka.base_consumer import BaseConsumer
-from src.schemas.kafka import KafkaMessage
-from src.settings import kafka_settings, youtube_settings
+from src.infrastructure.schemas.kafka import KafkaMessage
+from src.settings import settings
 
 
 class YouTubeConsumer(BaseConsumer):
-    topic = kafka_settings.topic_youtube
+    topic = settings.kafka_settings.topic_youtube
 
     async def process_message(self, message: KafkaMessage) -> None:
         yt_channel_id = message.account_id
+
         try:
             creds = google.oauth2.credentials.Credentials(
                 token=message.access_token,
                 refresh_token=message.refresh_token,
-                token_uri=youtube_settings.token_uri,
-                client_id=youtube_settings.client_id,
-                client_secret=youtube_settings.client_secret,
+                token_uri=settings.youtube_settings.token_uri,
+                client_id=settings.youtube_settings.client_id,
+                client_secret=settings.youtube_settings.client_secret,
             )
 
             if not creds or not creds.valid:

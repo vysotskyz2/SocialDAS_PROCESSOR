@@ -3,10 +3,12 @@ from uuid import UUID
 from loguru import logger
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.infrastructure.models.instagram import (
-    User, UserSnapshot, Post, Story, ProfileInsight, MediaType, InsightPeriod,
+    User, UserSnapshot, Post, Story, ProfileInsight, PostInsight, MediaType, InsightPeriod,
 )
 from src.infrastructure.repositories.base import BaseRepository
-from src.schemas.instagram import IGProfileResponse, IGMediaItem, IGStoryItem, IGInsightMetric
+from src.infrastructure.schemas.instagram import (
+    IGProfileResponse, IGMediaItem, IGStoryItem, IGInsightMetric, IGPostInsightMetric,
+)
 
 
 class InstagramRepository(BaseRepository):
@@ -113,6 +115,35 @@ class InstagramRepository(BaseRepository):
                 set_={k: v for k, v in values.items() if k not in ("ig_id", "user_id")},
             )
             .returning(Story.id)
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()
+
+    async def upsert_post_insight(
+        self, post_id: UUID, metric: IGPostInsightMetric, snapshot_date: datetime
+    ) -> None:
+        allowed_columns = {"reach", "saved", "views", "shares"}
+        if metric.name not in allowed_columns:
+            logger.warning(f"Неизвестная метрика поста: {metric.name}, пропускаем")
+            return
+
+        value: int = 0
+        if metric.values:
+            value = metric.values[0].value
+
+        values = {
+            "post_id": post_id,
+            "date": snapshot_date,
+            metric.name: value,
+        }
+        stmt = (
+            pg_insert(PostInsight)
+            .values(**values)
+            .on_conflict_do_update(
+                constraint="uix_ig_post_insight_date",
+                set_={metric.name: value},
+            )
+            .returning(PostInsight.id)
         )
         await self._session.execute(stmt)
         await self._session.flush()

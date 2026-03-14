@@ -1,6 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel, Field
-from src.schemas.base import BaseIGItem
+from src.infrastructure.schemas.base import BaseIGItem
 
 
 class IGProfileResponse(BaseModel):
@@ -45,6 +45,19 @@ class IGStoryItem(BaseIGItem):
 
 class IGStoryList(BaseModel):
     data: list[IGStoryItem] = Field(default_factory=list)
+
+
+class IGPostInsightMetric(BaseModel):
+    id: str
+    name: str
+    period: str
+    values: Optional[list[IGInsightValue]] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
+class IGPostInsightList(BaseModel):
+    data: list[IGPostInsightMetric] = Field(default_factory=list)
 
 
 class NormalizedIGProfile(BaseModel):

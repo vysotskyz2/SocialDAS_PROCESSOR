@@ -14,8 +14,12 @@ class TTUserData(BaseModel):
     video_count: Optional[int] = None
 
 
+class TTUserContainer(BaseModel):
+    user: Optional[TTUserData] = None
+
+
 class TTUserInfoResponse(BaseModel):
-    data: Optional[TTUserData] = None
+    data: Optional[TTUserContainer] = None
     error: Optional[dict] = None
 
 

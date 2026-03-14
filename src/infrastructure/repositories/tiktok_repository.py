@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.infrastructure.models.tiktok import TikTokUser, TikTokUserSnapshot, TikTokVideo, TikTokVideoSnapshot
 from src.infrastructure.repositories.base import BaseRepository
-from src.schemas.tiktok import TTUserData, TTVideoItem
+from src.infrastructure.schemas.tiktok import TTUserData, TTVideoItem
 
 
 class TikTokRepository(BaseRepository):

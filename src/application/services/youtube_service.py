@@ -5,8 +5,8 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.concurrency import run_in_threadpool
 from src.infrastructure.repositories.youtube_repository import YouTubeRepository
-from src.schemas.youtube import YTChannelItem, YTVideoItem
-from src.settings import youtube_settings
+from src.infrastructure.schemas.youtube import YTChannelItem, YTVideoItem
+from src.settings import settings
 
 
 class YouTubeService:
@@ -20,7 +20,7 @@ class YouTubeService:
             self.fetch_sync,
             creds=self.creds,
             yt_channel_id=yt_channel_id,
-            max_per_page=youtube_settings.max_videos_per_page,
+            max_per_page=settings.youtube_settings.max_videos_per_page,
         )
 
         if not channel_dict:

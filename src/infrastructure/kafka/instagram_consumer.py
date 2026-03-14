@@ -2,15 +2,16 @@ from loguru import logger
 from src.application.services.instagram_service import InstagramService
 from src.infrastructure.database import async_session_factory
 from src.infrastructure.kafka.base_consumer import BaseConsumer
-from src.schemas.kafka import KafkaMessage
-from src.settings import kafka_settings
+from src.infrastructure.schemas.kafka import KafkaMessage
+from src.settings import settings
 
 
 class InstagramConsumer(BaseConsumer):
-    topic = kafka_settings.topic_instagram
+    topic = settings.kafka_settings.topic_instagram
 
     async def process_message(self, message: KafkaMessage) -> None:
         ig_user_id = message.account_id
+
         try:
             token = message.access_token
             async with async_session_factory() as session:

@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from aiokafka import AIOKafkaConsumer
 from loguru import logger
 from pydantic import ValidationError
-from src.schemas.kafka import KafkaMessage
-from src.settings import kafka_settings
+from src.infrastructure.schemas.kafka import KafkaMessage
+from src.settings import settings
 
 
 class BaseConsumer(ABC):
@@ -15,8 +15,8 @@ class BaseConsumer(ABC):
     def __init__(self) -> None:
         self._consumer = AIOKafkaConsumer(
             self.topic,
-            bootstrap_servers=kafka_settings.bootstrap_servers,
-            group_id=kafka_settings.group_id,
+            bootstrap_servers=settings.kafka_settings.bootstrap_servers,
+            group_id=settings.kafka_settings.group_id,
             value_deserializer=lambda m: json.loads(m.decode("utf-8")),
             auto_offset_reset="earliest",
             enable_auto_commit=True,

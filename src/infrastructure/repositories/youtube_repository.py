@@ -3,14 +3,7 @@ from uuid import UUID
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.infrastructure.models.youtube import YouTubeChannel, YouTubeChannelSnapshot, YouTubeVideo, YouTubeVideoSnapshot
 from src.infrastructure.repositories.base import BaseRepository
-from src.schemas.youtube import YTChannelItem, YTVideoItem
-
-
-def _safe_int(value: str | None) -> int | None:
-    try:
-        return int(value) if value is not None else None
-    except (ValueError, TypeError):
-        return None
+from src.infrastructure.schemas.youtube import YTChannelItem, YTVideoItem
 
 
 class YouTubeRepository(BaseRepository):
@@ -52,9 +45,9 @@ class YouTubeRepository(BaseRepository):
         values = {
             "channel_id": channel_id,
             "date": today,
-            "subscriber_count": _safe_int(stats.subscriberCount) if stats else None,
-            "video_count": _safe_int(stats.videoCount) if stats else None,
-            "view_count": _safe_int(stats.viewCount) if stats else None,
+            "subscriber_count": self._safe_int(stats.subscriberCount) if stats else None,
+            "video_count": self._safe_int(stats.videoCount) if stats else None,
+            "view_count": self._safe_int(stats.viewCount) if stats else None,
         }
         stmt = (
             pg_insert(YouTubeChannelSnapshot)
@@ -104,9 +97,9 @@ class YouTubeRepository(BaseRepository):
         values = {
             "video_id": video_id,
             "date": today,
-            "view_count": _safe_int(stats.viewCount) if stats else None,
-            "like_count": _safe_int(stats.likeCount) if stats else None,
-            "comment_count": _safe_int(stats.commentCount) if stats else None,
+            "view_count": self._safe_int(stats.viewCount) if stats else None,
+            "like_count": self._safe_int(stats.likeCount) if stats else None,
+            "comment_count": self._safe_int(stats.commentCount) if stats else None,
         }
         stmt = (
             pg_insert(YouTubeVideoSnapshot)
@@ -119,3 +112,10 @@ class YouTubeRepository(BaseRepository):
         )
         await self._session.execute(stmt)
         await self._session.flush()
+
+    @staticmethod
+    def _safe_int(value: str | None) -> int | None:
+        try:
+            return int(value) if value is not None else None
+        except (ValueError, TypeError):
+            return None
